@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clinical Iowa Gambling Task (cIGT) - Live Lab</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Chart.js for Discrepancy & Learning Curve Visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Canvas Confetti for winning celebrate -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,400&family=Space+Grotesk:wght@500;700&display=swap');
+        
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background-color: #d4d8de;
+            color: #1e293b;
+            overscroll-behavior: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .heading-font {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        /* Card flip and hover tactile effect for touchscreens */
+        .poker-card {
+            perspective: 1000px;
+            transition: transform 0.08s ease, filter 0.08s ease;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            aspect-ratio: 2 / 3; /* Authentic vertical playing card proportions */
+        }
+
+        .poker-card:active:not(:disabled) {
+            transform: scale(0.96);
+            filter: brightness(1.1);
+        }
+
+        .poker-card:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            filter: grayscale(0.2);
+        }
+
+        /* Glassmorphic panels for briefing and results */
+        .glass-panel {
+            background: #0f172a;
+            color: #f8fafc;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Authentic Red Diamond Playing Card Back */
+        .kmu-card-back {
+            background-color: #c52222;
+            background-image: 
+                repeating-linear-gradient(45deg, rgba(255,255,255,0.2) 0, rgba(255,255,255,0.2) 3px, transparent 0, transparent 6px),
+                repeating-linear-gradient(-45deg, rgba(255,255,255,0.2) 0, rgba(255,255,255,0.2) 3px, transparent 0, transparent 6px),
+                radial-gradient(circle at 50% 50%, #dc2626 0%, #991b1b 100%);
+            border: 1.5px solid #ffffff;
+            box-shadow: inset 0 0 6px rgba(0,0,0,0.35), 0 3px 6px rgba(0,0,0,0.2);
+        }
+
+        /* Gentle pulse for phone rotation hint */
+        @keyframes rotate-phone {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(90deg); }
+        }
+        .animate-rotate-hint {
+            animation: rotate-phone 2s infinite ease-in-out;
+        }
+
+        /* Show rotate banner only on mobile portrait orientation */
+        @media screen and (orientation: portrait) and (max-width: 850px) {
+            #portraitRotateHint {
+                display: flex !important;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen w-full bg-[#d4d8de] flex flex-col justify-center items-center selection:bg-teal-500 selection:text-white antialiased overflow-x-hidden">
+
+    <!-- Orientation Reminder for Portrait Mode on Mobile Phones -->
+    <div id="portraitRotateHint" class="hidden fixed inset-0 z-50 bg-slate-950/95 text-white flex-col items-center justify-center p-6 text-center backdrop-blur-sm">
+        <div class="w-16 h-16 rounded-2xl bg-teal-500/20 border border-teal-500/40 flex items-center justify-center text-teal-300 text-3xl mb-4 animate-rotate-hint">
+            <i class="fa-solid fa-mobile-screen-button"></i>
+        </div>
+        <h3 class="heading-font text-lg font-bold text-white mb-2">Please Rotate Your Phone</h3>
+        <p class="text-xs text-slate-300 max-w-xs leading-relaxed mb-4">
+            This clinical experiment is designed for horizontal (landscape) mode to mirror the standardized computer laboratory interface.
+        </p>
+        <button onclick="document.getElementById('portraitRotateHint').style.display='none'" class="px-3.5 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs border border-slate-700 active:scale-95">
+            Continue anyway
+        </button>
+    </div>
+
+    <!-- ================= VIEW 1: WELCOME & BRIEFING ================= -->
+    <section id="viewWelcome" class="w-full min-h-[100dvh] flex items-center justify-center p-2 sm:p-4 bg-slate-950 overflow-y-auto">
+        <div class="glass-panel p-3 sm:p-5 rounded-xl shadow-2xl border border-slate-700/60 max-w-xl w-full relative overflow-hidden my-auto">
+            <div class="flex items-center justify-between gap-2 mb-2">
+                <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-300 text-[10px] sm:text-xs font-medium">
+                    <i class="fa-solid fa-flask-vial"></i> Standardized Briefing
+                </div>
+                <span class="text-[10px] text-slate-400 font-mono"><i class="fa-solid fa-rotate mr-1"></i> Landscape Mode</span>
+            </div>
+
+            <h2 class="heading-font text-lg sm:text-xl font-bold text-white mb-1 leading-tight">
+                Clinical Iowa Gambling Task
+            </h2>
+
+            <p class="text-slate-300 text-[11px] sm:text-xs mb-3 leading-relaxed">
+                Make 100 card selections. Your objective is to <strong class="text-teal-300 font-semibold">maximize total profit and avoid losing money</strong>.
+            </p>
+
+            <div class="grid grid-cols-3 gap-2 mb-3">
+                <div class="bg-slate-900/90 p-2 rounded-lg border border-slate-800">
+                    <div class="text-teal-400 text-xs mb-0.5"><i class="fa-solid fa-wallet"></i> <strong>$5,000 Loan</strong></div>
+                    <p class="text-[10px] text-slate-400 leading-tight">Wins add to bonus. Losses deduct from bonus, then principal.</p>
+                </div>
+                <div class="bg-slate-900/90 p-2 rounded-lg border border-slate-800">
+                    <div class="text-cyan-400 text-xs mb-0.5"><i class="fa-solid fa-hand-pointer"></i> <strong>Free Choice</strong></div>
+                    <p class="text-[10px] text-slate-400 leading-tight">Pick from Decks A, B, C, or D. Switch freely at any time.</p>
+                </div>
+                <div class="bg-slate-900/90 p-2 rounded-lg border border-slate-800">
+                    <div class="text-amber-400 text-xs mb-0.5"><i class="fa-solid fa-triangle-exclamation"></i> <strong>Clinical Hint</strong></div>
+                    <p class="text-[10px] text-slate-400 leading-tight">Some decks are worse than others. Avoiding them is how you win.</p>
+                </div>
+            </div>
+
+            <button id="btnStartGame" class="w-full py-2.5 rounded-lg bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-bold text-xs tracking-wide shadow-md shadow-teal-500/25 active:scale-95 transition flex items-center justify-center gap-1.5">
+                <span>Start Experiment</span>
+                <i class="fa-solid fa-arrow-right text-[11px]"></i>
+            </button>
+        </div>
+    </section>
+
+    <!-- ================= VIEW 2: PURE CLINICAL cIGT SCREEN (TIGHT PROPORTIONAL LAYOUT) ================= -->
+    <section id="viewExperiment" class="hidden w-full min-h-[100dvh] max-h-[100dvh] bg-[#d4d8de] flex-col items-center justify-center p-1 sm:p-2 select-none overflow-hidden touch-manipulation">
+        
+        <!-- Authentic cIGT Computer Stage Container (Preserves compact 4:3 / 16:9 clinical desktop window) -->
+        <div class="w-full max-w-xl md:max-w-2xl bg-[#e3e6eb] rounded-lg border border-slate-400/80 shadow-md p-2 sm:p-3 flex flex-col justify-center items-center gap-1.5 sm:gap-2">
+            
+            <!-- Dual Meters: Bonus & Principal -->
+            <div class="w-full bg-white px-2 sm:px-3 py-1 sm:py-1.5 rounded border border-slate-400 shadow-sm">
+                
+                <!-- Upper Tick Axis (0 to 6000) -->
+                <div class="flex justify-between text-[8px] sm:text-[9px] font-mono text-slate-700 pl-12 sm:pl-14 pr-1 mb-0.5">
+                    <span>0</span>
+                    <span>1000</span>
+                    <span>2000</span>
+                    <span>3000</span>
+                    <span>4000</span>
+                    <span>5000</span>
+                    <span>6000</span>
+                </div>
+
+                <!-- Meter Row 1: Bonus -->
+                <div class="flex items-center gap-1.5 sm:gap-2 mb-0.5">
+                    <div class="w-11 sm:w-12 text-right font-bold text-[9px] sm:text-[10px] text-slate-800 tracking-tight shrink-0">Bonus</div>
+                    <div class="flex-grow h-3 sm:h-3.5 bg-slate-100 border border-slate-400 relative overflow-hidden rounded-sm">
+                        <div class="absolute inset-0 grid grid-cols-6 pointer-events-none border-r border-slate-300">
+                            <div class="border-r border-slate-300 h-full"></div>
+                            <div class="border-r border-slate-300 h-full"></div>
+                            <div class="border-r border-slate-300 h-full"></div>
+                            <div class="border-r border-slate-300 h-full"></div>
+                            <div class="border-r border-slate-300 h-full"></div>
+                        </div>
+                        <div id="barBonus" class="h-full bg-gradient-to-r from-emerald-500 to-green-400 transition-all duration-150 relative z-10" style="width: 0%;"></div>
+                    </div>
+                </div>
+
+                <!-- Meter Row 2: Principal (Initial 5000) -->
+                <div class="flex items-center gap-1.5 sm:gap-2">
+                    <div class="w-11 sm:w-12 text-right font-bold text-[9px] sm:text-[10px] text-slate-800 tracking-tight shrink-0">Principal</div>
+                    <div class="flex-grow h-3 sm:h-3.5 bg-slate-100 border border-slate-400 relative overflow-hidden rounded-sm">
+                        <div class="absolute inset-0 grid grid-cols-6 pointer-events-none border-r border-slate-300">
+                            <div class="border-r border-slate-300 h-full"></div>
+                            <div class="border-r border-slate-300 h-full"></div>
+                            <div class="border-r border-slate-300 h-full"></div>
+                            <div class="border-r border-slate-300 h-full"></div>
+                            <div class="border-r border-slate-300 h-full"></div>
+                        </div>
+                        <div id="barPrincipal" class="h-full bg-blue-600 transition-all duration-150 relative z-10" style="width: 83.33%;"></div>
+                    </div>
+                </div>
+
+                <!-- Lower Axis & Currency Unit -->
+                <div class="flex items-center justify-between text-[8px] sm:text-[9px] font-mono text-slate-700 pl-12 sm:pl-14 pr-1 mt-0.5">
+                    <div class="flex justify-between flex-grow mr-2">
+                        <span>0</span>
+                        <span>1000</span>
+                        <span>2000</span>
+                        <span>3000</span>
+                        <span>4000</span>
+                        <span>5000</span>
+                        <span>6000</span>
+                    </div>
+                    <div class="font-sans font-bold text-slate-700 text-[8px] sm:text-[9px] whitespace-nowrap">Unit ($)</div>
+                </div>
+            </div>
+
+            <!-- Standard Instruction Prompt -->
+            <div class="text-center my-0.5">
+                <h3 class="text-sm sm:text-base font-black text-slate-900 tracking-wide font-serif">
+                    Please Select a Card
+                </h3>
+            </div>
+
+            <!-- The 4 Decks with Pop-Up Slots (Vertical Playing Card Ratio) -->
+            <div class="grid grid-cols-4 gap-2 sm:gap-3 md:gap-4 w-full px-1 items-start justify-center">
+                
+                <!-- Deck A -->
+                <div class="flex flex-col items-center w-full">
+                    <div id="slotA" class="w-full h-6 sm:h-7 bg-white border border-slate-400 rounded-t shadow-sm mb-0.5 flex flex-col items-center justify-center text-[9px] sm:text-[10px] font-bold transition-all">
+                        <span class="text-slate-400 font-mono text-[8px]">--</span>
+                    </div>
+                    <button id="cardA" onclick="handleDeckSelection('A')" class="poker-card w-full max-w-[110px] rounded-b kmu-card-back flex flex-col justify-between items-center p-1 sm:p-1.5 cursor-pointer shadow">
+                        <span class="text-[7px] sm:text-[8px] text-white/60 font-mono">cIGT</span>
+                        <div class="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-white/20 border border-white/50 flex items-center justify-center text-white font-bold text-[8px] sm:text-[10px]">♠</div>
+                        <span class="text-[7px] sm:text-[8px] text-white/60 font-mono">A</span>
+                    </button>
+                    <span class="mt-0.5 text-xs sm:text-sm font-black text-slate-900 font-serif">A</span>
+                </div>
+
+                <!-- Deck B -->
+                <div class="flex flex-col items-center w-full">
+                    <div id="slotB" class="w-full h-6 sm:h-7 bg-white border border-slate-400 rounded-t shadow-sm mb-0.5 flex flex-col items-center justify-center text-[9px] sm:text-[10px] font-bold transition-all">
+                        <span class="text-slate-400 font-mono text-[8px]">--</span>
+                    </div>
+                    <button id="cardB" onclick="handleDeckSelection('B')" class="poker-card w-full max-w-[110px] rounded-b kmu-card-back flex flex-col justify-between items-center p-1 sm:p-1.5 cursor-pointer shadow">
+                        <span class="text-[7px] sm:text-[8px] text-white/60 font-mono">cIGT</span>
+                        <div class="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-white/20 border border-white/50 flex items-center justify-center text-white font-bold text-[8px] sm:text-[10px]">♦</div>
+                        <span class="text-[7px] sm:text-[8px] text-white/60 font-mono">B</span>
+                    </button>
+                    <span class="mt-0.5 text-xs sm:text-sm font-black text-slate-900 font-serif">B</span>
+                </div>
+
+                <!-- Deck C -->
+                <div class="flex flex-col items-center w-full">
+                    <div id="slotC" class="w-full h-6 sm:h-7 bg-white border border-slate-400 rounded-t shadow-sm mb-0.5 flex flex-col items-center justify-center text-[9px] sm:text-[10px] font-bold transition-all">
+                        <span class="text-slate-400 font-mono text-[8px]">--</span>
+                    </div>
+                    <button id="cardC" onclick="handleDeckSelection('C')" class="poker-card w-full max-w-[110px] rounded-b kmu-card-back flex flex-col justify-between items-center p-1 sm:p-1.5 cursor-pointer shadow">
+                        <span class="text-[7px] sm:text-[8px] text-white/60 font-mono">cIGT</span>
+                        <div class="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-white/20 border border-white/50 flex items-center justify-center text-white font-bold text-[8px] sm:text-[10px]">♣</div>
+                        <span class="text-[7px] sm:text-[8px] text-white/60 font-mono">C</span>
+                    </button>
+                    <span class="mt-0.5 text-xs sm:text-sm font-black text-slate-900 font-serif">C</span>
+                </div>
+
+                <!-- Deck D -->
+                <div class="flex flex-col items-center w-full">
+                    <div id="slotD" class="w-full h-6 sm:h-7 bg-white border border-slate-400 rounded-t shadow-sm mb-0.5 flex flex-col items-center justify-center text-[9px] sm:text-[10px] font-bold transition-all">
+                        <span class="text-slate-400 font-mono text-[8px]">--</span>
+                    </div>
+                    <button id="cardD" onclick="handleDeckSelection('D')" class="poker-card w-full max-w-[110px] rounded-b kmu-card-back flex flex-col justify-between items-center p-1 sm:p-1.5 cursor-pointer shadow">
+                        <span class="text-[7px] sm:text-[8px] text-white/60 font-mono">cIGT</span>
+                        <div class="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-white/20 border border-white/50 flex items-center justify-center text-white font-bold text-[8px] sm:text-[10px]">♥</div>
+                        <span class="text-[7px] sm:text-[8px] text-white/60 font-mono">D</span>
+                    </button>
+                    <span class="mt-0.5 text-xs sm:text-sm font-black text-slate-900 font-serif">D</span>
+                </div>
+            </div>
+
+            <!-- Immediate Payoff Text Box (Slim, directly attached) -->
+            <div class="w-full px-2.5 py-1 bg-white/90 rounded border border-slate-300 flex items-center justify-between text-[9px] sm:text-[10px] font-mono text-slate-800">
+                <div class="truncate mr-2">
+                    <span class="font-bold">Latest:</span>
+                    <span id="kmuPayoffLog" class="text-slate-900 font-semibold">Ready. Tap any card to begin.</span>
+                </div>
+                <div class="whitespace-nowrap shrink-0">
+                    <span>Total:</span>
+                    <span id="kmuCurrentTotal" class="font-bold text-blue-700 font-mono text-[10px] sm:text-xs">$5,000</span>
+                </div>
+            </div>
+
+        </div>
+
+    </section>
+
+    <!-- ================= VIEW 3: CLINICAL DEBRIEFING REPORT ================= -->
+    <section id="viewResults" class="hidden w-full min-h-screen bg-slate-950 p-2 sm:p-5 flex-col gap-3 max-w-5xl mx-auto pb-10 overflow-y-auto">
+        <div class="glass-panel p-3 sm:p-4 rounded-xl border border-slate-800 flex justify-between items-center gap-2">
+            <div>
+                <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 text-[10px] font-mono mb-1">
+                    <i class="fa-solid fa-clipboard-check"></i> cIGT Complete
+                </div>
+                <h2 class="heading-font text-base sm:text-xl font-bold text-white">
+                    cIGT Debriefing Report
+                </h2>
+                <p class="text-[11px] text-slate-400">
+                    Final Capital: <span id="resFinalCapital" class="font-mono font-bold text-emerald-400 text-xs sm:text-sm">$0</span>
+                    (Loan: $5,000)
+                </p>
+            </div>
+
+            <!-- Net Score Summary Pill -->
+            <div class="flex items-center gap-2 bg-slate-900/90 px-3 py-1.5 rounded-lg border border-slate-700">
+                <div>
+                    <div class="text-[9px] text-slate-400 uppercase font-semibold">Net Score</div>
+                    <div class="text-[8px] text-slate-500 font-mono">(C + D) − (A + B)</div>
+                    <div id="resNetScore" class="text-lg sm:text-xl font-black font-mono text-cyan-400">0</div>
+                </div>
+                <div id="resNetBadge" class="px-2 py-1 rounded text-[11px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                    Neutral
+                </div>
+            </div>
+        </div>
+
+        <!-- Selection Breakdown Grid (The 4 Decks) -->
+        <div class="grid grid-cols-4 gap-2">
+            <div class="glass-panel p-2 rounded-lg border-l-4 border-amber-500">
+                <div class="flex justify-between items-center mb-0.5">
+                    <span class="font-bold text-amber-400 text-xs">Deck A</span>
+                    <span class="text-[8px] px-1 py-0.2 rounded bg-slate-800 text-slate-300 font-mono">Frequent Loss</span>
+                </div>
+                <div class="text-lg sm:text-xl font-bold font-mono text-white" id="statCountA">0</div>
+                <div class="text-[8px] text-slate-400">Exp: -3,750 / 10</div>
+            </div>
+
+            <div class="glass-panel p-2 rounded-lg border-l-4 border-rose-500">
+                <div class="flex justify-between items-center mb-0.5">
+                    <span class="font-bold text-rose-400 text-xs">Deck B</span>
+                    <span class="text-[8px] px-1 py-0.2 rounded bg-rose-500/20 text-rose-300 font-mono font-semibold">90% Win Freq</span>
+                </div>
+                <div class="text-lg sm:text-xl font-bold font-mono text-white" id="statCountB">0</div>
+                <div class="text-[8px] text-slate-400">Exp: -3,750 / 10</div>
+            </div>
+
+            <div class="glass-panel p-2 rounded-lg border-l-4 border-teal-500">
+                <div class="flex justify-between items-center mb-0.5">
+                    <span class="font-bold text-teal-400 text-xs">Deck C</span>
+                    <span class="text-[8px] px-1 py-0.2 rounded bg-slate-800 text-slate-300 font-mono">Frequent Loss</span>
+                </div>
+                <div class="text-lg sm:text-xl font-bold font-mono text-white" id="statCountC">0</div>
+                <div class="text-[8px] text-slate-400">Exp: +1,875 / 10</div>
+            </div>
+
+            <div class="glass-panel p-2 rounded-lg border-l-4 border-emerald-500">
+                <div class="flex justify-between items-center mb-0.5">
+                    <span class="font-bold text-emerald-400 text-xs">Deck D</span>
+                    <span class="text-[8px] px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-mono font-semibold">90% Win Freq</span>
+                </div>
+                <div class="text-lg sm:text-xl font-bold font-mono text-white" id="statCountD">0</div>
+                <div class="text-[8px] text-slate-400">Exp: +1,875 / 10</div>
+            </div>
+        </div>
+
+        <!-- Visual Dynamics Section (Side-by-side in landscape) -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-2 sm:gap-3">
+            <div class="glass-panel p-2.5 rounded-lg border border-slate-800">
+                <h3 class="font-bold text-xs text-slate-300 mb-1 flex items-center gap-1">
+                    <i class="fa-solid fa-chart-simple text-teal-400"></i> Deck Selections
+                </h3>
+                <div class="h-36 relative">
+                    <canvas id="chartDistribution"></canvas>
+                </div>
+            </div>
+
+            <div class="glass-panel p-2.5 rounded-lg border border-slate-800 md:col-span-2">
+                <div class="flex items-center justify-between gap-1 mb-1">
+                    <h3 class="font-bold text-xs text-slate-300 flex items-center gap-1">
+                        <i class="fa-solid fa-chart-line text-cyan-400"></i> 4-Deck Trajectory Across 5 Blocks
+                    </h3>
+                    <span class="text-[8px] font-mono text-cyan-300 bg-cyan-950 px-1 py-0.2 rounded border border-cyan-800">
+                        20 / Block
+                    </span>
+                </div>
+                <div class="h-36 relative">
+                    <canvas id="chartFourDecks"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Net Score Dynamics Across 5 Blocks -->
+        <div class="glass-panel p-2.5 rounded-lg border border-slate-800">
+            <div class="flex items-center justify-between gap-1 mb-1">
+                <h3 class="font-bold text-xs text-slate-300 flex items-center gap-1">
+                    <i class="fa-solid fa-wave-square text-teal-400"></i> Net Score Dynamics Across Blocks
+                </h3>
+                <span class="text-[9px] text-slate-400 font-mono">(C + D) − (A + B)</span>
+            </div>
+            <div class="h-32 relative">
+                <canvas id="chartLearningCurve"></canvas>
+            </div>
+        </div>
+
+        <!-- Debriefing Insight Card -->
+        <div class="glass-panel p-3 rounded-xl border border-amber-500/30 bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/20">
+            <div class="flex items-center gap-2 text-amber-400 font-bold mb-1">
+                <i class="fa-solid fa-lightbulb text-sm"></i>
+                <h3 class="text-xs sm:text-sm heading-font">Win Frequency vs. Expected Value</h3>
+            </div>
+            <p class="text-[11px] text-slate-300 leading-relaxed mb-2.5">
+                Did you favor <strong>Deck B</strong> and <strong>Deck D</strong>? Both decks deliver a <strong>90% win frequency without penalty</strong>. Human intuition is guided by immediate gain frequency rather than mathematical expected value.
+            </p>
+            <button onclick="resetAndRestartExperiment()" class="w-full sm:w-auto px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs border border-slate-600 active:scale-95 transition flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-rotate-right"></i>
+                <span>Restart for Next Student</span>
+            </button>
+        </div>
+    </section>
+
+    <script>
+        const CIGT_PAYOFF_SCHEDULE = [
+            // Trial 1
+            { A: { win: 100, loss: 0 },    B: { win: 100, loss: 0 },     C: { win: 50, loss: 0 },    D: { win: 50, loss: 0 } },
+            // Trial 2
+            { A: { win: 120, loss: 0 },    B: { win: 80, loss: 0 },      C: { win: 60, loss: 0 },    D: { win: 40, loss: 0 } },
+            // Trial 3
+            { A: { win: 80, loss: -150 },  B: { win: 110, loss: 0 },     C: { win: 40, loss: -50 },  D: { win: 45, loss: 0 } },
+            // Trial 4
+            { A: { win: 90, loss: 0 },     B: { win: 120, loss: 0 },     C: { win: 55, loss: 0 },    D: { win: 45, loss: 0 } },
+            // Trial 5
+            { A: { win: 110, loss: -300 }, B: { win: 90, loss: 0 },      C: { win: 55, loss: -50 },  D: { win: 55, loss: 0 } },
+            // Trial 6
+            { A: { win: 100, loss: 0 },    B: { win: 100, loss: 0 },     C: { win: 45, loss: 0 },    D: { win: 60, loss: 0 } },
+            // Trial 7
+            { A: { win: 80, loss: -200 },  B: { win: 90, loss: 0 },      C: { win: 50, loss: -50 },  D: { win: 40, loss: 0 } },
+            // Trial 8
+            { A: { win: 120, loss: 0 },    B: { win: 120, loss: 0 },     C: { win: 45, loss: 0 },    D: { win: 55, loss: 0 } },
+            // Trial 9
+            { A: { win: 110, loss: -250 }, B: { win: 110, loss: -1250 }, C: { win: 60, loss: -50 },  D: { win: 50, loss: 0 } },
+            // Trial 10
+            { A: { win: 90, loss: -350 },  B: { win: 80, loss: 0 },      C: { win: 40, loss: -50 },  D: { win: 60, loss: -250 } },
+
+            // Trial 11
+            { A: { win: 110, loss: 0 },    B: { win: 110, loss: 0 },     C: { win: 55, loss: 0 },    D: { win: 55, loss: 0 } },
+            // Trial 12
+            { A: { win: 130, loss: -350 }, B: { win: 100, loss: 0 },     C: { win: 55, loss: -25 },  D: { win: 40, loss: 0 } },
+            // Trial 13
+            { A: { win: 90, loss: 0 },     B: { win: 90, loss: 0 },      C: { win: 65, loss: -75 },  D: { win: 60, loss: 0 } },
+            // Trial 14
+            { A: { win: 100, loss: -250 }, B: { win: 130, loss: -1500 }, C: { win: 45, loss: 0 },    D: { win: 40, loss: 0 } },
+            // Trial 15
+            { A: { win: 120, loss: -200 }, B: { win: 120, loss: 0 },     C: { win: 70, loss: -25 },  D: { win: 45, loss: 0 } },
+            // Trial 16
+            { A: { win: 110, loss: 0 },    B: { win: 130, loss: 0 },     C: { win: 40, loss: 0 },    D: { win: 55, loss: 0 } },
+            // Trial 17
+            { A: { win: 90, loss: -300 },  B: { win: 110, loss: 0 },     C: { win: 50, loss: -25 },  D: { win: 65, loss: 0 } },
+            // Trial 18
+            { A: { win: 130, loss: -150 }, B: { win: 90, loss: 0 },      C: { win: 60, loss: -75 },  D: { win: 70, loss: 0 } },
+            // Trial 19
+            { A: { win: 120, loss: -250 }, B: { win: 100, loss: 0 },     C: { win: 70, loss: 0 },    D: { win: 50, loss: 0 } },
+            // Trial 20
+            { A: { win: 100, loss: 0 },    B: { win: 120, loss: 0 },     C: { win: 40, loss: -50 },  D: { win: 70, loss: -275 } },
+
+            // Trial 21
+            { A: { win: 120, loss: -250 }, B: { win: 120, loss: -1750 }, C: { win: 60, loss: 0 },    D: { win: 60, loss: 0 } },
+            // Trial 22
+            { A: { win: 140, loss: -300 }, B: { win: 110, loss: 0 },     C: { win: 65, loss: -25 },  D: { win: 55, loss: 0 } },
+            // Trial 23
+            { A: { win: 110, loss: 0 },    B: { win: 140, loss: 0 },     C: { win: 55, loss: 0 },    D: { win: 65, loss: 0 } },
+            // Trial 24
+            { A: { win: 110, loss: -350 }, B: { win: 130, loss: 0 },     C: { win: 80, loss: -50 },  D: { win: 80, loss: 0 } },
+            // Trial 25
+            { A: { win: 100, loss: 0 },    B: { win: 100, loss: 0 },     C: { win: 40, loss: -25 },  D: { win: 40, loss: 0 } },
+            // Trial 26
+            { A: { win: 120, loss: -200 }, B: { win: 110, loss: 0 },     C: { win: 60, loss: -50 },  D: { win: 80, loss: 0 } },
+            // Trial 27
+            { A: { win: 130, loss: -250 }, B: { win: 120, loss: 0 },     C: { win: 55, loss: 0 },    D: { win: 40, loss: 0 } },
+            // Trial 28
+            { A: { win: 110, loss: -150 }, B: { win: 120, loss: 0 },     C: { win: 65, loss: -25 },  D: { win: 65, loss: 0 } },
+            // Trial 29
+            { A: { win: 140, loss: -250 }, B: { win: 140, loss: 0 },     C: { win: 40, loss: -75 },  D: { win: 55, loss: -300 } },
+            // Trial 30
+            { A: { win: 120, loss: 0 },    B: { win: 110, loss: 0 },     C: { win: 80, loss: -50 },  D: { win: 60, loss: 0 } },
+
+            // Trial 31
+            { A: { win: 130, loss: -350 }, B: { win: 130, loss: 0 },     C: { win: 65, loss: -25 },  D: { win: 65, loss: 0 } },
+            // Trial 32
+            { A: { win: 120, loss: -200 }, B: { win: 140, loss: -2000 }, C: { win: 75, loss: 0 },    D: { win: 75, loss: 0 } },
+            // Trial 33
+            { A: { win: 140, loss: -250 }, B: { win: 120, loss: 0 },     C: { win: 55, loss: -25 },  D: { win: 60, loss: 0 } },
+            // Trial 34
+            { A: { win: 130, loss: -250 }, B: { win: 110, loss: 0 },     C: { win: 60, loss: -25 },  D: { win: 65, loss: 0 } },
+            // Trial 35
+            { A: { win: 110, loss: -150 }, B: { win: 130, loss: 0 },     C: { win: 70, loss: -25 },  D: { win: 75, loss: -325 } },
+            // Trial 36
+            { A: { win: 150, loss: 0 },    B: { win: 150, loss: 0 },     C: { win: 65, loss: 0 },    D: { win: 85, loss: 0 } },
+            // Trial 37
+            { A: { win: 140, loss: -150 }, B: { win: 110, loss: 0 },     C: { win: 55, loss: -75 },  D: { win: 45, loss: 0 } },
+            // Trial 38
+            { A: { win: 120, loss: -300 }, B: { win: 150, loss: 0 },     C: { win: 75, loss: -25 },  D: { win: 55, loss: 0 } },
+            // Trial 39
+            { A: { win: 150, loss: -350 }, B: { win: 120, loss: 0 },     C: { win: 45, loss: -50 },  D: { win: 70, loss: 0 } },
+            // Trial 40
+            { A: { win: 110, loss: 0 },    B: { win: 140, loss: 0 },     C: { win: 85, loss: -75 },  D: { win: 55, loss: 0 } },
+
+            // Trial 41
+            { A: { win: 140, loss: -350 }, B: { win: 140, loss: 0 },     C: { win: 70, loss: -25 },  D: { win: 70, loss: 0 } },
+            // Trial 42
+            { A: { win: 130, loss: -200 }, B: { win: 150, loss: 0 },     C: { win: 80, loss: 0 },    D: { win: 80, loss: 0 } },
+            // Trial 43
+            { A: { win: 150, loss: -250 }, B: { win: 130, loss: 0 },     C: { win: 60, loss: -25 },  D: { win: 65, loss: 0 } },
+            // Trial 44
+            { A: { win: 140, loss: -250 }, B: { win: 120, loss: 0 },     C: { win: 65, loss: -25 },  D: { win: 70, loss: 0 } },
+            // Trial 45
+            { A: { win: 120, loss: -150 }, B: { win: 140, loss: 0 },     C: { win: 75, loss: -25 },  D: { win: 80, loss: -350 } },
+            // Trial 46
+            { A: { win: 160, loss: 0 },    B: { win: 160, loss: -2250 }, C: { win: 70, loss: -25 },  D: { win: 90, loss: 0 } },
+            // Trial 47
+            { A: { win: 150, loss: -150 }, B: { win: 120, loss: 0 },     C: { win: 60, loss: -75 },  D: { win: 50, loss: 0 } },
+            // Trial 48
+            { A: { win: 130, loss: -300 }, B: { win: 160, loss: 0 },     C: { win: 80, loss: -25 },  D: { win: 60, loss: 0 } },
+            // Trial 49
+            { A: { win: 160, loss: -350 }, B: { win: 130, loss: 0 },     C: { win: 50, loss: -50 },  D: { win: 75, loss: 0 } },
+            // Trial 50
+            { A: { win: 120, loss: -250 }, B: { win: 150, loss: 0 },     C: { win: 90, loss: -75 },  D: { win: 60, loss: 0 } },
+
+            // Trial 51
+            { A: { win: 150, loss: -350 }, B: { win: 150, loss: 0 },     C: { win: 75, loss: -25 },  D: { win: 75, loss: 0 } },
+            // Trial 52
+            { A: { win: 140, loss: -200 }, B: { win: 160, loss: 0 },     C: { win: 85, loss: -25 },  D: { win: 85, loss: 0 } },
+            // Trial 53
+            { A: { win: 160, loss: -250 }, B: { win: 140, loss: 0 },     C: { win: 65, loss: -25 },  D: { win: 70, loss: 0 } },
+            // Trial 54
+            { A: { win: 150, loss: -250 }, B: { win: 130, loss: 0 },     C: { win: 70, loss: -25 },  D: { win: 75, loss: 0 } },
+            // Trial 55
+            { A: { win: 130, loss: -150 }, B: { win: 150, loss: 0 },     C: { win: 80, loss: -25 },  D: { win: 85, loss: 0 } },
+            // Trial 56
+            { A: { win: 170, loss: -250 }, B: { win: 170, loss: 0 },     C: { win: 75, loss: -25 },  D: { win: 95, loss: 0 } },
+            // Trial 57
+            { A: { win: 160, loss: -150 }, B: { win: 130, loss: 0 },     C: { win: 65, loss: -75 },  D: { win: 55, loss: 0 } },
+            // Trial 58
+            { A: { win: 140, loss: -300 }, B: { win: 170, loss: -2500 }, C: { win: 85, loss: -25 },  D: { win: 65, loss: -375 } },
+            // Trial 59
+            { A: { win: 170, loss: -350 }, B: { win: 140, loss: 0 },     C: { win: 55, loss: -50 },  D: { win: 80, loss: 0 } },
+            // Trial 60
+            { A: { win: 130, loss: -250 }, B: { win: 160, loss: 0 },     C: { win: 95, loss: -75 },  D: { win: 65, loss: 0 } }
+        ];
+
+        const TOTAL_TRIALS = 100;
+        const INITIAL_CAPITAL = 5000;
+
+        let currentCapital = INITIAL_CAPITAL;
+        let totalTrialsCompleted = 0;
+        const deckPicks = { A: 0, B: 0, C: 0, D: 0 };
+        const choiceHistory = [];
+
+        let distChartInstance = null;
+        let fourDecksChartInstance = null;
+        let learningChartInstance = null;
+
+        document.getElementById('btnStartGame').addEventListener('click', () => {
+            document.getElementById('viewWelcome').classList.add('hidden');
+            const expView = document.getElementById('viewExperiment');
+            expView.classList.remove('hidden');
+            expView.classList.add('flex');
+            updateHud();
+        });
+
+        function updateHud() {
+            const kmuTotal = document.getElementById('kmuCurrentTotal');
+            if (kmuTotal) kmuTotal.innerText = `$${currentCapital.toLocaleString()}`;
+
+            const principalAmount = Math.max(0, Math.min(5000, currentCapital));
+            const bonusAmount = Math.max(0, currentCapital - 5000);
+
+            const scaleMax = Math.max(6000, currentCapital);
+            const principalWidthPct = (principalAmount / scaleMax) * 100;
+            const bonusWidthPct = (bonusAmount / scaleMax) * 100;
+
+            const barPrincipal = document.getElementById('barPrincipal');
+            const barBonus = document.getElementById('barBonus');
+            if (barPrincipal) barPrincipal.style.width = `${principalWidthPct}%`;
+            if (barBonus) barBonus.style.width = `${bonusWidthPct}%`;
+        }
+
+        function handleDeckSelection(deck) {
+            if (totalTrialsCompleted >= TOTAL_TRIALS) return;
+
+            setDecksDisabled(true);
+
+            ['A', 'B', 'C', 'D'].forEach(d => {
+                const slot = document.getElementById(`slot${d}`);
+                if (slot) {
+                    slot.innerHTML = '<span class="text-slate-400 font-mono text-[8px]">--</span>';
+                    slot.className = 'w-full h-6 sm:h-7 bg-white border border-slate-400 rounded-t shadow-sm mb-0.5 flex flex-col items-center justify-center text-[9px] sm:text-[10px] font-bold transition-all';
+                }
+            });
+
+            const pickIndex = deckPicks[deck] % CIGT_PAYOFF_SCHEDULE.length;
+            const payout = CIGT_PAYOFF_SCHEDULE[pickIndex][deck];
+
+            const winAmount = payout.win;
+            const lossAmount = payout.loss;
+            const netAmount = winAmount + lossAmount;
+
+            deckPicks[deck]++;
+            totalTrialsCompleted++;
+            currentCapital += netAmount;
+
+            choiceHistory.push({
+                trial: totalTrialsCompleted,
+                deck: deck,
+                win: winAmount,
+                loss: lossAmount,
+                net: netAmount,
+                capitalAfter: currentCapital
+            });
+
+            const activeSlot = document.getElementById(`slot${deck}`);
+            if (activeSlot) {
+                activeSlot.classList.add('border-blue-500', 'bg-blue-50/50');
+                if (lossAmount < 0) {
+                    activeSlot.innerHTML = `
+                        <div class="text-emerald-600 font-bold text-[8px] sm:text-[9px] leading-tight">+${winAmount}</div>
+                        <div class="text-rose-600 font-bold text-[8px] sm:text-[9px] leading-tight">-${Math.abs(lossAmount)}</div>
+                    `;
+                } else {
+                    activeSlot.innerHTML = `
+                        <div class="text-emerald-600 font-bold text-[8px] sm:text-[9px] leading-tight">+${winAmount}</div>
+                        <div class="text-slate-400 font-normal text-[7px] sm:text-[8px] leading-tight">No penalty</div>
+                    `;
+                }
+            }
+
+            const logElem = document.getElementById('kmuPayoffLog');
+            if (logElem) {
+                if (lossAmount < 0) {
+                    logElem.innerHTML = `Deck ${deck}: <span class="text-emerald-600 font-bold">+$${winAmount}</span>, Penalty <span class="text-rose-600 font-bold">-$${Math.abs(lossAmount)}</span>`;
+                } else {
+                    logElem.innerHTML = `Deck ${deck}: <span class="text-emerald-600 font-bold">+$${winAmount}</span> (No penalty)`;
+                }
+            }
+
+            updateHud();
+
+            if (totalTrialsCompleted >= TOTAL_TRIALS) {
+                setTimeout(() => {
+                    completeExperiment();
+                }, 800);
+            } else {
+                setTimeout(() => {
+                    setDecksDisabled(false);
+                }, 250);
+            }
+        }
+
+        function setDecksDisabled(disabled) {
+            ['A', 'B', 'C', 'D'].forEach(d => {
+                const btn = document.getElementById(`card${d}`);
+                if (btn) btn.disabled = disabled;
+            });
+        }
+
+        function completeExperiment() {
+            const expView = document.getElementById('viewExperiment');
+            if (expView) {
+                expView.classList.add('hidden');
+                expView.classList.remove('flex');
+            }
+            const resView = document.getElementById('viewResults');
+            if (resView) {
+                resView.classList.remove('hidden');
+                resView.classList.add('flex');
+            }
+
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 70,
+                    spread: 60,
+                    origin: { y: 0.6 }
+                });
+            }
+
+            const badPicks = deckPicks.A + deckPicks.B;
+            const goodPicks = deckPicks.C + deckPicks.D;
+            const netScore = goodPicks - badPicks;
+
+            const resFinalCapital = document.getElementById('resFinalCapital');
+            if (resFinalCapital) resFinalCapital.innerText = `$${currentCapital.toLocaleString()}`;
+
+            const resNetScore = document.getElementById('resNetScore');
+            if (resNetScore) resNetScore.innerText = (netScore > 0 ? `+${netScore}` : `${netScore}`);
+            
+            const netBadge = document.getElementById('resNetBadge');
+            if (netBadge) {
+                if (netScore > 0) {
+                    netBadge.innerText = 'Positive';
+                    netBadge.className = 'px-3 py-2 rounded-xl flex items-center justify-center text-xs sm:text-sm font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40';
+                } else if (netScore < 0) {
+                    netBadge.innerText = 'Negative';
+                    netBadge.className = 'px-3 py-2 rounded-xl flex items-center justify-center text-xs sm:text-sm font-bold bg-rose-500/20 text-rose-400 border border-rose-500/40';
+                } else {
+                    netBadge.innerText = 'Neutral (0)';
+                    netBadge.className = 'px-3 py-2 rounded-xl flex items-center justify-center text-xs sm:text-sm font-bold bg-slate-700/50 text-slate-300 border border-slate-600';
+                }
+            }
+
+            const statA = document.getElementById('statCountA');
+            if (statA) statA.innerText = `${deckPicks.A}`;
+
+            const statB = document.getElementById('statCountB');
+            if (statB) statB.innerText = `${deckPicks.B}`;
+
+            const statC = document.getElementById('statCountC');
+            if (statC) statC.innerText = `${deckPicks.C}`;
+
+            const statD = document.getElementById('statCountD');
+            if (statD) statD.innerText = `${deckPicks.D}`;
+
+            renderCharts();
+        }
+
+        function renderCharts() {
+            const ctxDist = document.getElementById('chartDistribution').getContext('2d');
+            if (distChartInstance) distChartInstance.destroy();
+
+            distChartInstance = new Chart(ctxDist, {
+                type: 'bar',
+                data: {
+                    labels: ['Deck A', 'Deck B', 'Deck C', 'Deck D'],
+                    datasets: [{
+                        label: 'Picks',
+                        data: [deckPicks.A, deckPicks.B, deckPicks.C, deckPicks.D],
+                        backgroundColor: [
+                            'rgba(245, 158, 11, 0.85)',
+                            'rgba(244, 63, 94, 0.85)',
+                            'rgba(20, 184, 166, 0.85)',
+                            'rgba(16, 185, 129, 0.85)'
+                        ],
+                        borderRadius: 6,
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: Math.max(35, Math.max(deckPicks.A, deckPicks.B, deckPicks.C, deckPicks.D) + 5),
+                            grid: { color: 'rgba(255,255,255,0.06)' },
+                            ticks: { color: '#94a3b8' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#cbd5e1', font: { weight: 'bold' } }
+                        }
+                    }
+                }
+            });
+
+            const blockA = [0, 0, 0, 0, 0];
+            const blockB = [0, 0, 0, 0, 0];
+            const blockC = [0, 0, 0, 0, 0];
+            const blockD = [0, 0, 0, 0, 0];
+            const blockNetScores = [0, 0, 0, 0, 0];
+
+            for (let b = 0; b < 5; b++) {
+                const blockChoices = choiceHistory.slice(b * 20, (b + 1) * 20);
+                blockChoices.forEach(c => {
+                    if (c.deck === 'A') blockA[b]++;
+                    if (c.deck === 'B') blockB[b]++;
+                    if (c.deck === 'C') blockC[b]++;
+                    if (c.deck === 'D') blockD[b]++;
+                });
+                blockNetScores[b] = (blockC[b] + blockD[b]) - (blockA[b] + blockB[b]);
+            }
+
+            const ctxFourDecks = document.getElementById('chartFourDecks').getContext('2d');
+            if (fourDecksChartInstance) fourDecksChartInstance.destroy();
+
+            fourDecksChartInstance = new Chart(ctxFourDecks, {
+                type: 'line',
+                data: {
+                    labels: ['B1 (1-20)', 'B2 (21-40)', 'B3 (41-60)', 'B4 (61-80)', 'B5 (81-100)'],
+                    datasets: [
+                        {
+                            label: 'Deck A',
+                            data: blockA,
+                            borderColor: '#f59e0b',
+                            backgroundColor: '#f59e0b',
+                            tension: 0.25,
+                            borderWidth: 2,
+                            pointRadius: 4
+                        },
+                        {
+                            label: 'Deck B (90% Win)',
+                            data: blockB,
+                            borderColor: '#f43f5e',
+                            backgroundColor: '#f43f5e',
+                            tension: 0.25,
+                            borderWidth: 2.5,
+                            pointRadius: 5
+                        },
+                        {
+                            label: 'Deck C',
+                            data: blockC,
+                            borderColor: '#14b8a6',
+                            backgroundColor: '#14b8a6',
+                            tension: 0.25,
+                            borderWidth: 2,
+                            pointRadius: 4
+                        },
+                        {
+                            label: 'Deck D (90% Win)',
+                            data: blockD,
+                            borderColor: '#10b981',
+                            backgroundColor: '#10b981',
+                            tension: 0.25,
+                            borderWidth: 2.5,
+                            pointRadius: 5
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: { color: '#cbd5e1', boxWidth: 12, font: { size: 11 } }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 20,
+                            grid: { color: 'rgba(255,255,255,0.06)' },
+                            ticks: { color: '#94a3b8' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#cbd5e1' }
+                        }
+                    }
+                }
+            });
+
+            const ctxLearning = document.getElementById('chartLearningCurve').getContext('2d');
+            if (learningChartInstance) learningChartInstance.destroy();
+
+            learningChartInstance = new Chart(ctxLearning, {
+                type: 'line',
+                data: {
+                    labels: ['B1 (1-20)', 'B2 (21-40)', 'B3 (41-60)', 'B4 (61-80)', 'B5 (81-100)'],
+                    datasets: [{
+                        label: 'Net Score: (C+D) - (A+B)',
+                        data: blockNetScores,
+                        borderColor: '#06b6d4',
+                        backgroundColor: 'rgba(6, 182, 212, 0.15)',
+                        fill: true,
+                        tension: 0.3,
+                        pointBackgroundColor: '#06b6d4',
+                        pointBorderColor: '#ffffff',
+                        pointRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#cbd5e1' } } },
+                    scales: {
+                        y: {
+                            suggestedMin: -20,
+                            suggestedMax: 20,
+                            grid: { color: 'rgba(255,255,255,0.06)' },
+                            ticks: { color: '#94a3b8' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#cbd5e1' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function resetAndRestartExperiment() {
+            currentCapital = INITIAL_CAPITAL;
+            totalTrialsCompleted = 0;
+            deckPicks.A = 0;
+            deckPicks.B = 0;
+            deckPicks.C = 0;
+            deckPicks.D = 0;
+            choiceHistory.length = 0;
+
+            ['A', 'B', 'C', 'D'].forEach(d => {
+                const slot = document.getElementById(`slot${d}`);
+                if (slot) slot.innerHTML = '<span class="text-slate-400 font-mono text-[8px]">--</span>';
+            });
+
+            setDecksDisabled(false);
+
+            document.getElementById('viewResults').classList.add('hidden');
+            document.getElementById('viewResults').classList.remove('flex');
+            document.getElementById('viewExperiment').classList.remove('hidden');
+            document.getElementById('viewExperiment').classList.add('flex');
+            updateHud();
+        }
+    </script>
+</body>
+</html>
